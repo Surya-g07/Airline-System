@@ -1,5 +1,5 @@
 import java.util.*;
-
+import java.sql.*;
 class Flight {
     int flightNo;
     String source, destination;
@@ -17,7 +17,7 @@ class Flight {
     }
 }
 
-class Reservation {
+class Reservation { 
     int bookingId;
     String passengerName;
     int age;
@@ -43,10 +43,27 @@ public class AirlineReservationSystem {
     static int bookingCounter = 1000;
 
     public static void main(String[] args) {
-        flights.add(new Flight(101, "Chennai", "Delhi", 5000));
-        flights.add(new Flight(102, "Coimbatore", "Bangalore", 2000));
-        flights.add(new Flight(103, "Mumbai", "Goa", 3500));
-        flights.add(new Flight(104, "Hyderabad", "Kolkata", 4500));
+        
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection con = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/airline", "root", "");
+
+            Statement st = con.createStatement();
+            ResultSet rs = st.executeQuery("SELECT * FROM flights");
+
+            while (rs.next()) {
+                flights.add(new Flight(
+                        rs.getInt("flightNo"),
+                        rs.getString("source"),
+                        rs.getString("destination"),
+                        rs.getDouble("price")
+                ));
+            }
+            con.close();
+        } catch (Exception e) {
+            System.out.println("Database Error: " + e);
+        }
 
         while (true) {
             System.out.println("\n=== Airline Reservation System ===");
@@ -101,39 +118,83 @@ public class AirlineReservationSystem {
         }
 
         bookingCounter++;
-        Reservation r = new Reservation(bookingCounter, name, age, selected);
-        reservations.add(r);
-        System.out.println("Ticket booked successfully! Your Booking ID: " + bookingCounter);
+
+
+      try {
+            Connection con = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/airline", "root", "");
+
+            PreparedStatement ps = con.prepareStatement(
+                    "INSERT INTO reservations(bookingId, name, age, flightNo) VALUES(?,?,?,?)"
+            );
+
+            ps.setInt(1, bookingCounter);
+            ps.setString(2, name);
+            ps.setInt(3, age);
+            ps.setInt(4, selected.flightNo);
+
+            ps.executeUpdate();
+            con.close();
+
+            System.out.println("Ticket booked successfully! Your Booking ID: " + bookingCounter);
+
+        } catch (Exception e) {
+            System.out.println("Booking Error: " + e);
+        }
     }
 
     static void cancelTicket() {
         System.out.print("\nEnter Booking ID to cancel: ");
         int id = sc.nextInt();
 
-        Reservation toRemove = null;
-        for (Reservation r : reservations) {
-            if (r.bookingId == id) {
-                toRemove = r;
-                break;
-            }
-        }
+        try {
+            Connection con = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/airline", "root", "");
 
-        if (toRemove != null) {
-            reservations.remove(toRemove);
-            System.out.println("Booking cancelled successfully!");
-        } else {
-            System.out.println("Booking ID not found!");
+            PreparedStatement ps = con.prepareStatement(
+                    "DELETE FROM reservations WHERE bookingId = ?"
+            );
+            ps.setInt(1, id);
+
+            int rows = ps.executeUpdate();
+            con.close();
+
+            if (rows > 0)
+                System.out.println("Booking cancelled successfully!");
+            else
+                System.out.println("Booking ID not found!");
+
+        } catch (Exception e) {
+            System.out.println("Cancel Error: " + e);
         }
     }
 
-    static void viewReservations() {
-        if (reservations.isEmpty()) {
-            System.out.println("\nNo reservations found!");
-        } else {
-            System.out.println("\nCurrent Reservations:");
-            for (Reservation r : reservations) {
-                System.out.println(r);
+     static void viewReservations() {
+        System.out.println("\nCurrent Reservations:");
+
+        try {
+            Connection con = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/airline", "root", "");
+
+            Statement st = con.createStatement();
+            ResultSet rs = st.executeQuery("SELECT * FROM reservations");
+
+            boolean found = false;
+
+            while (rs.next()) {
+                found = true;
+                System.out.println(rs.getInt("bookingId") + " | " +
+                        rs.getString("name") + " | " +
+                        rs.getInt("age") + " | Flight " +
+                        rs.getInt("flightNo"));
             }
+
+            if (!found) System.out.println("No reservations found!");
+
+            con.close();
+        } catch (Exception e) {
+            System.out.println("View Error: " + e);
         }
     }
+
 }
